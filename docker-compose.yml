@@ -5,7 +5,8 @@
 services:
 
   server:
-    image: szurubooru/server:latest
+    build:
+      context: ./server
     depends_on:
       - sql
     environment:
@@ -14,8 +15,8 @@ services:
       POSTGRES_HOST: sql
       ## Credentials for database:
       POSTGRES_USER:
-      POSTGRES_PASSWORD:
-      ## Commented Values are Default:
+      POSTGRES_PASSWORD: ## Commented Values are Default:
+
       #POSTGRES_DB: defaults to same as POSTGRES_USER
       #POSTGRES_PORT: 5432
       #LOG_SQL: 0 (1 for verbose SQL logs)
@@ -25,7 +26,10 @@ services:
       - "./server/config.yaml:/opt/app/config.yaml"
 
   client:
-    image: szurubooru/client:latest
+    build:
+      context: ./client
+      args:
+        BUILD_INFO: marroq
     depends_on:
       - server
     environment:
