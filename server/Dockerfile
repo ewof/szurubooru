@@ -37,7 +37,7 @@ COPY ./ /opt/app/
 RUN rm -rf /opt/app/szurubooru/tests
 
 
-FROM --platform=$BUILDPLATFORM prereqs as testing
+FROM --platform=linux/amd64 prereqs as testing
 WORKDIR /opt/app
 
 RUN apk --no-cache add \
