@@ -153,8 +153,10 @@ def _category_filter(
 class PostSearchConfig(BaseSearchConfig):
     def __init__(self) -> None:
         self.user = None  # type: Optional[model.User]
+        self._pool_sort_id = None  # type: Optional[int]
 
     def on_search_query_parsed(self, search_query: SearchQuery) -> SaQuery:
+        self._pool_sort_id = None
         new_special_tokens = []
         for token in search_query.special_tokens:
             if token.value in ("fav", "liked", "disliked"):
@@ -177,6 +179,19 @@ class PostSearchConfig(BaseSearchConfig):
             else:
                 new_special_tokens.append(token)
         search_query.special_tokens = new_special_tokens
+
+        if not search_query.sort_tokens:
+            pool_tokens = [
+                token
+                for token in search_query.named_tokens
+                if token.name == "pool" and not token.negated
+            ]
+            if len(pool_tokens) == 1:
+                value = pool_tokens[0].criterion.value
+                try:
+                    self._pool_sort_id = int(value)
+                except (TypeError, ValueError):
+                    pass
 
     def create_around_query(self) -> SaQuery:
         return db.session.query(model.Post).options(sa.orm.lazyload("*"))
@@ -208,7 +223,15 @@ class PostSearchConfig(BaseSearchConfig):
         return db.session.query(model.Post)
 
     def finalize_query(self, query: SaQuery) -> SaQuery:
-        return query.order_by(model.Post.post_id.desc())
+        if self._pool_sort_id is not None:
+            return query.join(
+                model.PoolPost,
+                sa.and_(
+                    model.PoolPost.post_id == model.Post.post_id,
+                    model.PoolPost.pool_id == self._pool_sort_id,
+                ),
+            ).order_by(model.PoolPost.order.asc())
+        return query.order_by(model.Post.creation_time.desc())
 
     @property
     def id_column(self) -> SaColumn:
