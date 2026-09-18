@@ -5,12 +5,15 @@ const views = require("../util/views.js");
 
 const template = views.getTemplate("posts-page");
 
+let gridObserver = null;
+
 class PostsPageView extends events.EventTarget {
     constructor(ctx) {
         super();
         this._ctx = ctx;
         this._hostNode = ctx.hostNode;
         views.replaceContent(this._hostNode, template(ctx));
+        this._observeGrid();
 
         this._postIdToPost = {};
         for (let post of ctx.response.results) {
@@ -49,6 +52,7 @@ class PostsPageView extends events.EventTarget {
         }
 
         this._syncBulkEditorsHighlights();
+        this._fitGrid();
     }
 
     get _listItemNodes() {
@@ -65,6 +69,69 @@ class PostsPageView extends events.EventTarget {
 
     _getDeleteFlipperNode(listItemNode) {
         return listItemNode.querySelector(".delete-flipper");
+    }
+
+    _observeGrid() {
+        PostsPageView.stopFittingGrid();
+        const listNode = this._hostNode.querySelector(".post-list");
+        if (
+            !listNode ||
+            listNode.classList.contains("post-flow") ||
+            !document.body.classList.contains("posts-fit")
+        ) {
+            return;
+        }
+        gridObserver = new ResizeObserver(() => this._fitGrid());
+        gridObserver.observe(listNode);
+    }
+
+    _fitGrid() {
+        const listNode = this._hostNode.querySelector(".post-list");
+        const ulNode = listNode && listNode.querySelector("ul");
+        if (
+            !listNode ||
+            !ulNode ||
+            listNode.classList.contains("post-flow") ||
+            !document.body.classList.contains("posts-fit")
+        ) {
+            return;
+        }
+
+        const items = ulNode.querySelectorAll("li:not(.flexbox-dummy)");
+        if (!items.length) {
+            return;
+        }
+
+        const firstTop = items[0].offsetTop;
+        let cols = 0;
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].offsetTop !== firstTop) {
+                break;
+            }
+            cols++;
+        }
+
+        const styles = getComputedStyle(ulNode);
+        const gapY = parseFloat(styles.rowGap || styles.gap) || 0;
+        const availH = listNode.clientHeight;
+        if (availH <= 0 || cols <= 0) {
+            return;
+        }
+
+        const rows = Math.ceil(items.length / cols);
+        const maxRowH = window.innerWidth * 0.09;
+        const rowH = Math.max(
+            0,
+            Math.min(maxRowH, (availH - gapY * (rows - 1)) / rows)
+        );
+        listNode.style.setProperty("--post-grid-row-height", rowH + "px");
+    }
+
+    static stopFittingGrid() {
+        if (gridObserver) {
+            gridObserver.disconnect();
+            gridObserver = null;
+        }
     }
 
     _evtPostChange(e) {

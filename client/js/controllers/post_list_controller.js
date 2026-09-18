@@ -38,6 +38,11 @@ class PostListController {
         topNavigation.activate("posts");
         topNavigation.setTitle("Listing posts");
 
+        document.body.classList.toggle(
+            "posts-fit",
+            !settings.get().endlessScroll && !settings.get().postFlow
+        );
+
         this._headerView = new PostsHeaderView({
             hostNode: this._pageController.view.pageHeaderHolderNode,
             parameters: ctx.parameters,
@@ -185,5 +190,10 @@ class PostListController {
 module.exports = (router) => {
     router.enter(["posts"], (ctx, next) => {
         ctx.controller = new PostListController(ctx);
+    });
+    router.exit(["posts"], (ctx, next) => {
+        document.body.classList.remove("posts-fit");
+        PostsPageView.stopFittingGrid();
+        next();
     });
 };
